@@ -23,8 +23,10 @@ func TestGet(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	req.RemoteAddr = "192.168.0.1"
-
 	assert.NoError(t, proxy.Forward(recorder, req))
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	assert.Equal(t, "192.168.0.1", xForwardedFor)
+
+	body := recorder.Body.String()
+	assert.Equal(t, "!P R O X I E D!", body)
 }
