@@ -1,18 +1,52 @@
 package proxy
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"slices"
 	"strings"
 )
 
-func Forward(w http.ResponseWriter, r *http.Request) error {
+var (
+	ErrForbiddenHost = errors.New("host not allowed")
+)
+
+type Proxy struct {
+	// Use a map for fast lookup
+	forbiddenHosts map[string]bool
+}
+
+func New() *Proxy {
+	return &Proxy{}
+}
+
+func (p *Proxy) WithForbiddenHosts(hosts []string) *Proxy {
+	p.forbiddenHosts = make(map[string]bool)
+
+	for _, host := range hosts {
+		p.forbiddenHosts[host] = true
+	}
+
+	return p
+}
+
+func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 	targetURL, err := url.Parse(r.URL.String())
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %v", err)
+	}
+
+	host, err := extractHost(targetURL)
+	if err != nil {
+		return fmt.Errorf("failed to host: %v", err)
+	}
+
+	if _, forbidden := p.forbiddenHosts[host]; forbidden {
+		return ErrForbiddenHost
 	}
 
 	req, err := http.NewRequest(r.Method, targetURL.String(), r.Body)
@@ -38,6 +72,16 @@ func Forward(w http.ResponseWriter, r *http.Request) error {
 	io.Copy(w, resp.Body)
 
 	return nil
+}
+
+func extractHost(u *url.URL) (string, error) {
+	host := u.Host
+	hostname, _, err := net.SplitHostPort(host)
+	// Host does not have port
+	if err != nil {
+		return hostname, nil
+	}
+	return hostname, nil
 }
 
 func isHopHeader(header string) bool {
