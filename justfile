@@ -1,6 +1,6 @@
 # Run proxy server
 run:
-    go run main.go
+    go run main.go --forbidden-hosts forbidden_hosts.txt
 
 # Execute test suite
 test:

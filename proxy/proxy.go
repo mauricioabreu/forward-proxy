@@ -79,7 +79,7 @@ func extractHost(u *url.URL) (string, error) {
 	hostname, _, err := net.SplitHostPort(host)
 	// Host does not have port
 	if err != nil {
-		return hostname, nil
+		return host, nil
 	}
 	return hostname, nil
 }
