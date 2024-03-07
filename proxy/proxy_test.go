@@ -33,7 +33,7 @@ func TestGet(t *testing.T) {
 	assert.Equal(t, "!P R O X I E D!", body)
 }
 
-func TestGetOnDeniedDomain(t *testing.T) {
+func TestGetOnForbiddenHost(t *testing.T) {
 	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("!P R O X I E D!"))
@@ -44,7 +44,7 @@ func TestGetOnDeniedDomain(t *testing.T) {
 	assert.NoError(t, err)
 
 	recorder := httptest.NewRecorder()
-	p := proxy.New().WithForbiddenHosts([]string{remoteServer.URL})
+	p := proxy.New().WithForbiddenHosts([]string{"127.0.0.1"})
 
-	assert.NoError(t, p.Forward(recorder, req))
+	assert.ErrorIs(t, proxy.ErrForbiddenHost, p.Forward(recorder, req))
 }
