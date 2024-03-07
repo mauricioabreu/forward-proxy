@@ -13,11 +13,13 @@ import (
 
 var (
 	ErrForbiddenHost = errors.New("host not allowed")
+	ErrBannedWord    = errors.New("word not allowed")
 )
 
 type Proxy struct {
 	// Use a map for fast lookup
 	forbiddenHosts map[string]bool
+	bannedWords    map[string]bool
 }
 
 func New() *Proxy {

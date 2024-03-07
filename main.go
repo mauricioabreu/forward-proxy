@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/mauricioabreu/forward-proxy/proxy"
+	"github.com/mauricioabreu/forward-proxy/internal/proxy"
 )
 
 var (

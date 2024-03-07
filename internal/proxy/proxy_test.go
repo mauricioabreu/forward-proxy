@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mauricioabreu/forward-proxy/proxy"
+	"github.com/mauricioabreu/forward-proxy/internal/proxy"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -47,4 +47,19 @@ func TestGetOnForbiddenHost(t *testing.T) {
 	p := proxy.New().WithForbiddenHosts([]string{"127.0.0.1"})
 
 	assert.ErrorIs(t, proxy.ErrForbiddenHost, p.Forward(recorder, req))
+}
+
+func TestGetOnBannedWords(t *testing.T) {
+	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("!P R O X I E D!"))
+	}))
+	defer remoteServer.Close()
+
+	req, err := http.NewRequest("GET", remoteServer.URL, nil)
+	assert.NoError(t, err)
+
+	recorder := httptest.NewRecorder()
+	p := proxy.New()
+	assert.ErrorIs(t, proxy.ErrBannedWord, p.Forward(recorder, req))
 }
