@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+
+	"github.com/mauricioabreu/forward-proxy/internal/security"
 )
 
 var (
@@ -31,6 +34,16 @@ func (p *Proxy) WithForbiddenHosts(hosts []string) *Proxy {
 
 	for _, host := range hosts {
 		p.forbiddenHosts[host] = true
+	}
+
+	return p
+}
+
+func (p *Proxy) WithBannedWords(words []string) *Proxy {
+	p.bannedWords = make(map[string]bool)
+
+	for _, word := range words {
+		p.bannedWords[strings.ToLower(word)] = true
 	}
 
 	return p
@@ -68,6 +81,21 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return fmt.Errorf("failed to make request: %v", err)
 	}
+
+	var buf bytes.Buffer
+	teeBody := io.TeeReader(resp.Body, &buf)
+
+	body, err := io.ReadAll(teeBody)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	// Check banned words
+	if !security.AllowedWord(string(body), p.bannedWords) {
+		return ErrBannedWord
+	}
+
+	resp.Body = io.NopCloser(&buf)
 
 	copyResponseHeaders(resp, w)
 

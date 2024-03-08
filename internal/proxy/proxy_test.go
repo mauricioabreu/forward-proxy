@@ -52,7 +52,7 @@ func TestGetOnForbiddenHost(t *testing.T) {
 func TestGetOnBannedWords(t *testing.T) {
 	remoteServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("!P R O X I E D!"))
+		w.Write([]byte("FORWARD"))
 	}))
 	defer remoteServer.Close()
 
@@ -60,6 +60,6 @@ func TestGetOnBannedWords(t *testing.T) {
 	assert.NoError(t, err)
 
 	recorder := httptest.NewRecorder()
-	p := proxy.New()
+	p := proxy.New().WithBannedWords([]string{"forward", "proxy"})
 	assert.ErrorIs(t, proxy.ErrBannedWord, p.Forward(recorder, req))
 }
