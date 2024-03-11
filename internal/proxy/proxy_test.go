@@ -63,3 +63,43 @@ func TestGetOnBannedWords(t *testing.T) {
 	p := proxy.New().WithBannedWords([]string{"forward", "proxy"})
 	assert.ErrorIs(t, proxy.ErrBannedWord, p.Forward(recorder, req))
 }
+
+// func TestHTTPSRequest(t *testing.T) {
+// 	remoteHTTPSServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		w.WriteHeader(http.StatusOK)
+// 		w.Write([]byte("!P R O X I E D!"))
+// 	}))
+// 	defer remoteHTTPSServer.Close()
+
+// 	p := proxy.New()
+
+// 	req, err := http.NewRequest(http.MethodConnect, remoteHTTPSServer.URL, nil)
+// 	assert.NoError(t, err)
+
+// 	recorder := httptest.NewRecorder()
+
+// 	assert.NoError(t, p.HandleHTTPS(recorder, req))
+
+// 	assert.Equal(t, http.StatusOK, recorder.Code)
+
+// 	proxyURL, err := url.Parse(remoteHTTPSServer.URL)
+// 	assert.NoError(t, err)
+
+// 	client := &http.Client{
+// 		Transport: &http.Transport{
+// 			Proxy: http.ProxyURL(proxyURL),
+// 			TLSClientConfig: &tls.Config{
+// 				InsecureSkipVerify: true,
+// 			},
+// 		},
+// 	}
+
+// 	resp, err := client.Get(remoteHTTPSServer.URL)
+// 	assert.NoError(t, err)
+// 	defer resp.Body.Close()
+
+// 	body, err := io.ReadAll(resp.Body)
+// 	assert.NoError(t, err)
+// 	defer resp.Body.Close()
+// 	assert.Equal(t, "!P R O X I E D!", string(body))
+// }

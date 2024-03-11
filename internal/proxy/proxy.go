@@ -29,6 +29,16 @@ func New() *Proxy {
 	return &Proxy{}
 }
 
+func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := p.Forward(w, r); err != nil {
+		if errors.Is(err, ErrForbiddenHost) {
+			http.Error(w, "Access to the requests host is forbidden", http.StatusForbidden)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 func (p *Proxy) WithForbiddenHosts(hosts []string) *Proxy {
 	p.forbiddenHosts = make(map[string]bool)
 
@@ -50,6 +60,10 @@ func (p *Proxy) WithBannedWords(words []string) *Proxy {
 }
 
 func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
+	if r.Method == http.MethodConnect {
+		return p.HandleHTTPS(w, r)
+	}
+
 	targetURL, err := url.Parse(r.URL.String())
 	if err != nil {
 		return fmt.Errorf("failed to parse URL: %v", err)
@@ -90,7 +104,6 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	// Check banned words
 	if !security.AllowedWord(string(body), p.bannedWords) {
 		return ErrBannedWord
 	}
@@ -102,6 +115,38 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 	io.Copy(w, resp.Body)
 
 	return nil
+}
+
+func (p *Proxy) HandleHTTPS(w http.ResponseWriter, r *http.Request) error {
+	destConn, err := net.Dial("tcp", r.Host)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return err
+	}
+	w.WriteHeader(http.StatusOK)
+
+	hijacker, ok := w.(http.Hijacker)
+	if !ok {
+		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		return fmt.Errorf("hijacking not supported")
+	}
+
+	clientConn, _, err := hijacker.Hijack()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return fmt.Errorf("hijacking not supported")
+	}
+
+	go transfer(destConn, clientConn)
+	go transfer(clientConn, destConn)
+
+	return nil
+}
+
+func transfer(dest io.WriteCloser, source io.ReadCloser) {
+	defer dest.Close()
+	defer source.Close()
+	io.Copy(dest, source)
 }
 
 func extractHost(u *url.URL) (string, error) {
