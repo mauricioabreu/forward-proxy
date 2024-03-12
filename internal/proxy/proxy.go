@@ -35,6 +35,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Access to the requests host is forbidden", http.StatusForbidden)
 			return
 		}
+
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -69,10 +70,7 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 		return fmt.Errorf("failed to parse URL: %v", err)
 	}
 
-	host, err := extractHost(targetURL)
-	if err != nil {
-		return fmt.Errorf("failed to host: %v", err)
-	}
+	host := extractHost(targetURL)
 
 	if _, forbidden := p.forbiddenHosts[host]; forbidden {
 		return ErrForbiddenHost
@@ -89,12 +87,14 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 	if previous, exists := r.Header["X-Forwarded-For"]; exists {
 		clientIP = fmt.Sprintf("%s, %s", strings.Join(previous, ", "), clientIP)
 	}
+
 	req.Header.Set("X-Forwarded-For", clientIP)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to make request: %v", err)
 	}
+	defer resp.Body.Close()
 
 	var buf bytes.Buffer
 	teeBody := io.TeeReader(resp.Body, &buf)
@@ -112,7 +112,9 @@ func (p *Proxy) Forward(w http.ResponseWriter, r *http.Request) error {
 
 	copyResponseHeaders(resp, w)
 
-	io.Copy(w, resp.Body)
+	if _, err := io.Copy(w, resp.Body); err != nil {
+		return fmt.Errorf("failed to write response: %v", err)
+	}
 
 	return nil
 }
@@ -123,6 +125,7 @@ func (p *Proxy) HandleHTTPS(w http.ResponseWriter, r *http.Request) error {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return err
 	}
+
 	w.WriteHeader(http.StatusOK)
 
 	hijacker, ok := w.(http.Hijacker)
@@ -146,17 +149,19 @@ func (p *Proxy) HandleHTTPS(w http.ResponseWriter, r *http.Request) error {
 func transfer(dest io.WriteCloser, source io.ReadCloser) {
 	defer dest.Close()
 	defer source.Close()
-	io.Copy(dest, source)
+
+	io.Copy(dest, source) //nolint:errcheck //improve error handling here
 }
 
-func extractHost(u *url.URL) (string, error) {
+func extractHost(u *url.URL) string {
 	host := u.Host
 	hostname, _, err := net.SplitHostPort(host)
 	// Host does not have port
 	if err != nil {
-		return host, nil
+		return host
 	}
-	return hostname, nil
+
+	return hostname
 }
 
 func isHopHeader(header string) bool {

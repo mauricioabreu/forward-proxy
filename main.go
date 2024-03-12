@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/mauricioabreu/forward-proxy/internal/proxy"
 )
@@ -23,7 +24,11 @@ func init() {
 }
 
 const (
-	serverPort = "8989"
+	serverPort        = "8989"
+	readTimeout       = 1 * time.Second
+	writeTimeout      = 1 * time.Second
+	idleTimeout       = 30 * time.Second
+	readHeaderTimeout = 2 * time.Second
 )
 
 func main() {
@@ -45,10 +50,19 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to load banned words file: %v", err)
 		}
+
 		p.WithBannedWords(bannedWords)
 	}
 
-	if err := http.ListenAndServe(":"+serverPort, p); err != nil {
+	srv := &http.Server{
+		Addr:              ":" + serverPort,
+		Handler:           p,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to start server; %v", err)
 	}
 }
