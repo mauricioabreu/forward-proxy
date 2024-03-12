@@ -14,10 +14,12 @@ import (
 
 var (
 	forbiddenHostsFile string
+	bannedWordsFile    string
 )
 
 func init() {
 	flag.StringVar(&forbiddenHostsFile, "forbidden-hosts", "", "Forbidden hosts file")
+	flag.StringVar(&bannedWordsFile, "banned-words", "", "Banned words file")
 }
 
 const (
@@ -36,6 +38,14 @@ func main() {
 		}
 
 		p.WithForbiddenHosts(forbiddenHosts)
+	}
+
+	if bannedWordsFile != "" {
+		bannedWords, err := loadFromFile(bannedWordsFile)
+		if err != nil {
+			log.Fatalf("Failed to load banned words file: %v", err)
+		}
+		p.WithBannedWords(bannedWords)
 	}
 
 	if err := http.ListenAndServe(":"+serverPort, p); err != nil {
